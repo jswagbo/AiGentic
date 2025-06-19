@@ -1,0 +1,106 @@
+services:
+  # Redis for BullMQ job queue and caching
+  redis:
+    image: redis:7-alpine
+    container_name: aigentic-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aigentic-network
+
+  # PostgreSQL for production-like database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aigentic-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: aigentic
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aigentic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aigentic-network
+
+  # Mailhog for email testing and development
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: aigentic-mailhog
+    platform: linux/amd64  # Explicit platform for ARM64 compatibility
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    restart: unless-stopped
+    networks:
+      - aigentic-network
+
+  # Redis Commander for Redis management (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: aigentic-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aigentic-network
+    profiles:
+      - tools
+
+  # pgAdmin for PostgreSQL management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: aigentic-pgadmin
+    ports:
+      - "8080:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@aigentic.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aigentic-network
+    profiles:
+      - tools
+
+# Named volumes for data persistence
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  aigentic-network:
+    driver: bridge
+    name: aigentic-network 

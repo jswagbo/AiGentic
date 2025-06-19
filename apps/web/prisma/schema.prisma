@@ -1,0 +1,226 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts Account[]
+  sessions Session[]
+  projects Project[]
+  providerAccounts ProviderAccount[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// AIGentic specific models
+model ProviderAccount {
+  id             String   @id @default(cuid())
+  userId         String
+  providerType   String   // 'openai', 'veo3', 'runway', 'pika', 'heygen', 'elevenlabs', 'google-drive', 'socialblade'
+  providerName   String
+  accountId      String?
+  accessToken    String?  // Encrypted
+  refreshToken   String?  // Encrypted
+  tokenExpiresAt DateTime?
+  scopes         String?  // JSON array of scopes
+  metadata       String?  // JSON for provider-specific data
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerType])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  contentIdea String   // Original content idea from user
+  status      String   @default("draft") // 'draft', 'planned', 'rendering', 'ready', 'published', 'failed'
+  language    String   @default("en")
+  
+  // Provider selections
+  scriptProvider String  @default("openai") // 'openai', 'anthropic'
+  videoProvider  String  @default("veo3")   // 'veo3', 'runway', 'pika', 'heygen'
+  voiceProvider  String  @default("elevenlabs")
+  
+  // Workflow configuration
+  workflowConfig String? // YAML configuration
+  
+  // Generated content
+  generatedScript String?
+  videoUrl        String?
+  audioUrl        String?
+  thumbnailUrl    String?
+  
+  // Metadata
+  tags         String? // JSON array
+  targetNiche  String?
+  keywords     String? // JSON array
+  
+  // Timestamps
+  scheduledFor DateTime?
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowSteps WorkflowStep[]
+  jobs          Job[]
+}
+
+model WorkflowStep {
+  id        String   @id @default(cuid())
+  projectId String
+  stepName  String   // 'script-generation', 'video-creation', 'voice-synthesis', 'storage', 'publishing'
+  stepType  String   // 'script', 'video', 'audio', 'storage', 'publish'
+  provider  String   // Which provider to use for this step
+  status    String   @default("pending") // 'pending', 'running', 'completed', 'failed', 'skipped'
+  
+  // Configuration
+  config     String? // JSON configuration for this step
+  
+  // Input/Output
+  inputData  String? // JSON input data
+  outputData String? // JSON output data
+  
+  // Execution details
+  startedAt   DateTime?
+  completedAt DateTime?
+  errorMessage String?
+  retryCount   Int       @default(0)
+  
+  // Ordering
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jobs    Job[]
+
+  @@unique([projectId, stepName])
+}
+
+model Job {
+  id             String   @id @default(cuid())
+  projectId      String
+  workflowStepId String?
+  jobType        String   // 'workflow-step', 'scheduled-publish', 'cleanup'
+  status         String   @default("pending") // 'pending', 'active', 'completed', 'failed', 'delayed'
+  priority       Int      @default(0)
+  
+  // Job data
+  data           String?  // JSON job payload
+  result         String?  // JSON job result
+  
+  // Error handling
+  errorMessage   String?
+  stackTrace     String?
+  failedReason   String?
+  retryCount     Int      @default(0)
+  maxRetries     Int      @default(3)
+  
+  // Timing
+  scheduledFor   DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workflowStep WorkflowStep? @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
+}
+
+// Analytics and trends data
+model TrendData {
+  id         String   @id @default(cuid())
+  niche      String   // 'gaming', 'tech', 'lifestyle', etc.
+  keyword    String
+  popularity Float    // Popularity score
+  growth     Float    // Growth rate
+  source     String   @default("socialblade") // Data source
+  metadata   String?  // JSON additional data
+  date       DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([niche, keyword, date])
+}
+
+// System configuration and feature flags
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string") // 'string', 'number', 'boolean', 'json'
+  category  String   @default("general") // 'feature-flags', 'limits', 'providers', etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Webhook and notification logs
+model WebhookLog {
+  id          String   @id @default(cuid())
+  projectId   String?
+  webhookType String   // 'slack', 'discord', 'email'
+  event       String   // 'job-failed', 'project-completed', etc.
+  payload     String   // JSON payload sent
+  response    String?  // Response received
+  status      String   // 'sent', 'failed', 'pending'
+  createdAt   DateTime @default(now())
+} 
