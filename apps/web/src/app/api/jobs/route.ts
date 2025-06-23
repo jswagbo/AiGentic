@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest) {
       });
 
              // Transform database data to match frontend expectations
-       const workflowJobs = projects.map(project => {
+               const workflowJobs = projects.map((project: any) => {
          const latestJob = project.jobs[0];
          
          // Parse tags and keywords for metadata
@@ -48,7 +48,7 @@ export async function GET(_request: NextRequest) {
          let progress = 0;
          
          if (project.workflowSteps.length > 0) {
-           const completedSteps = project.workflowSteps.filter(step => step.status === 'completed').length;
+           const completedSteps = project.workflowSteps.filter((step: any) => step.status === 'completed').length;
            const totalSteps = project.workflowSteps.length;
            progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
            
@@ -59,7 +59,7 @@ export async function GET(_request: NextRequest) {
              currentState = 'completed';
            } else if (project.status === 'rendering') {
              // Find the current step
-             const runningStep = project.workflowSteps.find(step => step.status === 'running');
+             const runningStep = project.workflowSteps.find((step: any) => step.status === 'running');
              if (runningStep) {
                // Map workflow step types to UI states
                const stepTypeToState: Record<string, string> = {
@@ -86,7 +86,7 @@ export async function GET(_request: NextRequest) {
            metadata: {
              contentStyle: project.targetNiche || 'Educational',
              duration: 10, // Default duration, can be extracted from workflowConfig
-             selectedSteps: project.workflowSteps.map(step => step.stepType),
+             selectedSteps: project.workflowSteps.map((step: any) => step.stepType),
              topic: project.contentIdea,
              language: project.language,
              tags,

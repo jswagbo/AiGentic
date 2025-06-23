@@ -122,7 +122,7 @@ export async function GET(_request: NextRequest) {
       medium: 0,
       low: 0,
       by_type: {} as Record<string, number>,
-      recent: recentErrors.slice(0, 10).map(error => {
+      recent: recentErrors.slice(0, 10).map((error: any) => {
         try {
           const payload = JSON.parse(error.payload);
           return {
@@ -147,7 +147,7 @@ export async function GET(_request: NextRequest) {
     };
 
     // Calculate statistics
-    recentErrors.forEach(error => {
+    recentErrors.forEach((error: any) => {
       try {
         const payload = JSON.parse(error.payload);
         const severity = payload.severity || 'low';
